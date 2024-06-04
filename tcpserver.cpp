@@ -16,6 +16,12 @@ TcpServer::TcpServer(QObject* parent)
     startListen(8080);  //在8080端口进行监听
 }
 
+TcpServer& TcpServer::singleTon()
+{
+    static TcpServer server;
+    return server;
+}
+
 TcpServer::~TcpServer()
 {
     closeListen();
@@ -118,7 +124,20 @@ void TcpServer::on_addFriendRes(QJsonValue jsonvalue,qint64 friendId, QList<QIma
     }
 }
 
-
+// 在消息服务器进行文件消息的转发
+void TcpServer::transferFile(qint64 from, qint64 to, QString filename, QString filesize)
+{
+    for (auto& userSocket : socketList) {
+        if (userSocket->userId() == to) {
+            QJsonObject sendObj;
+            sendObj.insert("from", from);
+            sendObj.insert("filename", filename);
+            sendObj.insert("filesize", filesize);
+            userSocket->packingMessage(sendObj, FileMessage);
+            break;
+        }
+    }
+}
 
 
 

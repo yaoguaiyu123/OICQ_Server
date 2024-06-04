@@ -213,7 +213,7 @@ void ClientHandler::parsePackage()
     case PrivateMessage:
         parsePrivateMessage(byteArrayToJson(msgData), images);
         break;
-    case GroupMessage:
+    case FileMessage:
         break;
     case AddFriend:
         parseAddFriend(byteArrayToJson(msgData));

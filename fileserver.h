@@ -14,7 +14,6 @@ public:
     FileServer(QObject *parent = nullptr);
     ~FileServer();
     bool startFileServer(const QHostAddress &address, quint16 port);
-
 protected:
     void incomingConnection(qintptr socketDescriptor) override;
 

@@ -11,7 +11,7 @@ int main(int argc, char* argv[])
 {
     QApplication a(argc, argv);
     DBManager::singleTon().createTableFriendRequests();
-    TcpServer server;
+    TcpServer &server = TcpServer::singleTon();
     FileServer fileserver;
     return a.exec();
 }
