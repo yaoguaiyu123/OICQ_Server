@@ -10,6 +10,10 @@
 #include <QDebug>
 #include <QList>
 #include <QByteArray>
+#include <QRandomGenerator>
+
+QString getRandomString(int nLen);
+
 
 
 QJsonValue byteArrayToJson(const QByteArray& jsonData);

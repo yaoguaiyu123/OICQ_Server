@@ -8,6 +8,7 @@
 class ClientHandler;
 #include <QJsonValue>
 #include <QImage>
+class QThread;
 class TcpServer : public QTcpServer {
     Q_OBJECT
 public:
@@ -32,8 +33,10 @@ private:
     //管理多个socket
     QList<ClientHandler*> socketList;
     //方便查找对应的socket
-    ///之后再实现map的逻辑
+    // TODO 之后再实现map的逻辑
     QMap<qint64,ClientHandler*> socketMap;
+    // 管理socket对应的thread
+    QList<QThread*> threadList;
 
 protected:
     void incomingConnection(qintptr socketDescriptor);

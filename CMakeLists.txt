@@ -15,6 +15,8 @@ qt_add_executable(server
     global.h
     database/dbmanager.h database/dbmanager.cpp
     global.cpp
+    fileclienthandler.h fileclienthandler.cpp
+    fileserver.h fileserver.cpp
     rec.qrc
 )
 

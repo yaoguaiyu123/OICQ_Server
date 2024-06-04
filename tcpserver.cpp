@@ -7,12 +7,12 @@
 #include <QJsonDocument>
 #include <QtEndian>
 #include "global.h"
-
+#include <QThread>
 
 TcpServer::TcpServer(QObject* parent)
     : QTcpServer { parent }
 {
-    qDebug() << "服务端开始监听客户端连接";
+    qDebug() << tr("消息服务器开始在%1端口监听").arg(8080);
     startListen(8080);  //在8080端口进行监听
 }
 
@@ -37,14 +37,13 @@ void TcpServer::closeListen()
 
 void TcpServer::incomingConnection(qintptr socketDescriptor)
 {
-    // 调用父类的incomingConnection初始化套接字，不然需要手动setSocketDescriptor
-    QTcpServer::incomingConnection(socketDescriptor);
     qDebug() << "服务端获取一个新的连接,正在创建套接字.....";
-    // nextPendingConnection返回的套接字不需要再setSocketDescriptor，这是一个准备好的套接字
-    QTcpSocket* socket = nextPendingConnection();
-    if (socket == nullptr) {
-        return;
-    }
+    QTcpSocket* socket = new QTcpSocket();
+    socket->setSocketDescriptor(socketDescriptor);
+    QThread* thread = new QThread;
+    socket->moveToThread(thread);   //在一个线程中运行socket
+    thread->start();
+    threadList.append(thread);
     ClientHandler* clientHandler = new ClientHandler(socket, this);
     connect(clientHandler, &ClientHandler::disconnected, this, &TcpServer::on_disconnected);
     connect(clientHandler, &ClientHandler::transpond, this, &TcpServer::on_transpond);
@@ -53,12 +52,18 @@ void TcpServer::incomingConnection(qintptr socketDescriptor)
     socketList.append(clientHandler);
 }
 
-
+// 断开连接
 void TcpServer::on_disconnected(int id)
 {
     for (int i = 0; i < socketList.length(); ++i) {
         if (socketList.at(i)->userId() == id){
+            delete socketList[i];
             socketList.remove(i);
+            // 将线程对象也释放
+            threadList[i]->quit();
+            threadList[i]->wait();
+            delete threadList[i];
+            threadList.remove(i);
             qDebug() << QString("用户%1下线").arg(id);
         }
     }

@@ -4,14 +4,14 @@
 #include "database/dbmanager.h"
 #include <QDebug>
 #include <QDir>
+#include "fileserver.h"
+#include <QThread>
 
 int main(int argc, char* argv[])
 {
     QApplication a(argc, argv);
-    // qDebug() << QDir::currentPath();
     DBManager::singleTon().createTableFriendRequests();
     TcpServer server;
-    // Widget w;
-    // w.show();
+    FileServer fileserver;
     return a.exec();
 }
