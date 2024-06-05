@@ -17,7 +17,7 @@ public:
     void closeListen();
     void sendToClient(QJsonValue);
     static TcpServer& singleTon();
-    void transferFile(qint64 from ,qint64 to, QString filename,QString size);
+    void transferFile(qint64 from ,qint64 to, QString filename,QString size,qint64 messageId);
 signals:
     void signalUserStatus(const QString& text);
 

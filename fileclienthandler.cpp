@@ -6,17 +6,23 @@
 #include <QDir>
 #include "global.h"
 #include "tcpserver.h"
+#include "database/dbmanager.h"
+
+#define maxBlock 1024
 
 FileClientHandler::FileClientHandler(qintptr descriptor)
     : socketDescriptor(descriptor)
 {
 }
 
+
+
+// 处理 下载文件开头 或者 上传文件 的函数
 void FileClientHandler::run()
 {
-    QTcpSocket socket;
-    if (!socket.setSocketDescriptor(socketDescriptor)) {
-        qDebug() << "socket descriptor setup failed";
+    m_socket = new QTcpSocket;
+    if (!m_socket->setSocketDescriptor(socketDescriptor)) {
+        qDebug() << "设置失败 ";
         return;
     }
 
@@ -26,21 +32,24 @@ void FileClientHandler::run()
         dir.mkdir("file");
     }
 
-    qint64 recvSize = 0, totalSize = 0 , from ,to;
-    QString filename;
+    qint64 recvSize = 0, totalSize = 0 , from ,to , messageId;
+    QString filename , newFileName;
     QFile file;
-    bool is_begin = false;
+    bool is_Ubegin = false;
+    bool is_Dbegin = false;
 
     // 最多等待30s
-    while (socket.waitForReadyRead(30000)) {
-        QByteArray byteArray = socket.readAll();
+    while (m_socket->waitForReadyRead(30000)) {
+        qDebug() << "接收到数据";
+        QByteArray byteArray = m_socket->readAll();
         if (byteArray.isEmpty()) {
             qDebug() << "empty()";
             continue;
         }
-        if (byteArray[0] == 'U' && !is_begin) {
+        if (byteArray[0] == 'U' && !is_Ubegin) {
+            // 上传文件
             QDataStream stream(&byteArray, QIODevice::ReadOnly);
-            is_begin = true;
+            is_Ubegin = true;
             byteArray.remove(0, 1); // 去除开头
             stream >> totalSize; // 读取文件大小
             QByteArray nameByte;
@@ -48,7 +57,9 @@ void FileClientHandler::run()
             filename = QString::fromUtf8(nameByte);
             stream >> from;
             stream >> to;
-            file.setFileName(dir.path() + "/file/" + getRandomString(7) + "_" + filename);
+            stream >> messageId; // 消息ID
+            newFileName = dir.path() + "/file/" + getRandomString(7) + "_" + filename;
+            file.setFileName(newFileName);
             if (!file.open(QIODevice::WriteOnly)) {
                 qDebug() << "open file fail : " << file.fileName();
                 return;
@@ -56,46 +67,112 @@ void FileClientHandler::run()
                 qDebug() << "开始接收" << file.fileName() << "文件";
             }
             // 去除已读取部分
-            byteArray.remove(0, sizeof(qint64) + sizeof(qint32) + filename.length());
+            byteArray.remove(0, sizeof(qint64) * 4 + sizeof(qint32) + filename.length());
             qDebug() << "将要去除的数据包的长度(开头不算):" << sizeof(qint64) + sizeof(qint32) + filename.length();
             file.write(byteArray);
             recvSize += byteArray.size();
             qDebug() << recvSize << "   " << totalSize;
-        } else if (is_begin) {
-            // 继续写入文件
+            if (recvSize >= totalSize) {
+                break;
+            }
+        } else if (is_Ubegin) {
+            // 处理上传文件的数据包接收
             file.write(byteArray);
             recvSize += byteArray.size();
             qDebug() << recvSize << "   " << totalSize;
+            if (recvSize >= totalSize) {
+                break;
+            }
+        } else if (byteArray[0] == 'D' && !is_Dbegin) {
+            // 下载文件
+            qDebug() << "客户端想要下载1" << filename;
+            is_Dbegin = true;
+            byteArray.remove(0, 1);
+            QDataStream stream(byteArray);
+            qint64 to, from, messageId;
+            stream >> messageId >> from >> to;
+            QVariantMap vmap = DBManager::singleTon().queryFiles(messageId, from, to);
+            QString filename = vmap.value("filename").toString();
+            parseDownloadFile(filename);
+            break;
         } else {
-            // 开头错误
-            qDebug() << "开头错误";
+            // 错误
+            qDebug() << "have a undefined error!";
             return;
         }
     }
-    if (recvSize < totalSize) {
-        file.remove(); // 删除不完整的文件
-        // qDebug() << "文件接收不完整，已删除";
-    } else {
-        qDebug() << "文件接收成功" << file.fileName();
-        // 通知消息服务器进行转发
+    if (is_Ubegin) {
 
-        double kilobytes = totalSize / 1024.0;
-        double megabytes = totalSize / 1048576.0;
+        if (recvSize < totalSize) {
 
-        QString result;
-        if (totalSize >= 1048576) {
-            result = QString::number(megabytes, 'f', 2) + " MB";
-        } else if (totalSize >= 1024) {
-            result = QString::number(kilobytes, 'f', 2) + " KB";
+            file.remove(); // 删除不完整的文件
+            // qDebug() << "文件接收不完整，已删除";
         } else {
-            result = QString::number(totalSize) + " B";
+
+            qDebug() << "文件接收成功" << file.fileName();
+            // 通知消息服务器进行转发
+
+            double kilobytes = totalSize / 1024.0;
+            double megabytes = totalSize / 1048576.0;
+
+            QString filesize;
+            if (totalSize >= 1048576) {
+                filesize = QString::number(megabytes, 'f', 2) + " MB";
+            } else if (totalSize >= 1024) {
+                filesize = QString::number(kilobytes, 'f', 2) + " KB";
+            } else {
+                filesize = QString::number(totalSize) + " B";
+            }
+
+            TcpServer::singleTon().transferFile(from, to, newFileName, filesize, messageId);
         }
 
-        TcpServer::singleTon().transferFile(from, to, filename, result);
+        file.close();
     }
+}
 
+// 进行下载文件的函数
+/// 依次写入开头
+/// 文件名字
+/// 文件大小 8个字节
+/// 文件包数据
+void FileClientHandler::parseDownloadFile(const QString& filename)
+{
+    if (filename.isEmpty()) {
+        return;
+    }
+    qDebug() << "客户端想要下载" << filename;
+    QFileInfo fileInfo(filename);
+    QString fname = fileInfo.fileName();
+    QFile file(filename);
+    if (file.open(QIODevice::ReadOnly)) {
+        QByteArray uData = QByteArray("D");
+        m_socket->write(uData);
+        qint64 fileOffset = 0;
+        qint64 fileSize = file.size(); // 文件大小
+        QByteArray infoBytes;
+        QDataStream stream(&infoBytes, QIODevice::WriteOnly);
+        QByteArray namebytes = fname.toUtf8();
+        stream << namebytes; // 写入文件名数据
+        stream << fileSize; // 写入文件大小
+        m_socket->write(infoBytes);
+        while (fileOffset < fileSize) {
+            file.seek(fileOffset);
+            QByteArray byteArray = file.read(maxBlock);
+            m_socket->write(byteArray);
+            fileOffset += byteArray.size();
+        }
+    } else {
+        qDebug() << "文件路径错误" << filename;
+    }
     file.close();
 }
 
-
+FileClientHandler::~FileClientHandler()
+{
+    if (m_socket != nullptr) {
+        delete m_socket;
+        m_socket = nullptr;
+    }
+}
 

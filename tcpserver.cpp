@@ -8,6 +8,7 @@
 #include <QtEndian>
 #include "global.h"
 #include <QThread>
+#include "database/dbmanager.h"
 
 TcpServer::TcpServer(QObject* parent)
     : QTcpServer { parent }
@@ -125,8 +126,11 @@ void TcpServer::on_addFriendRes(QJsonValue jsonvalue,qint64 friendId, QList<QIma
 }
 
 // 在消息服务器进行文件消息的转发
-void TcpServer::transferFile(qint64 from, qint64 to, QString filename, QString filesize)
+void TcpServer::transferFile(qint64 from, qint64 to, QString filename, QString filesize,qint64 messageId)
 {
+    // 需要在数据库中存放文件的映射
+    DBManager::singleTon().insertIntoFiles(messageId, from, to, filename);
+    // 转发文件消息
     for (auto& userSocket : socketList) {
         if (userSocket->userId() == to) {
             QJsonObject sendObj;

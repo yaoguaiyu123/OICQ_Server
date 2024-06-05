@@ -400,3 +400,77 @@ bool DBManager::deleteFriendRequest(qint64 accountId, qint64 friendId) {
     return true;
 }
 
+
+// 文件表的创建函数
+bool DBManager::createTableFiles() {
+    if (!m_database.isOpen()) {
+        qDebug() << "Error: Database is not opened";
+        return false;
+    }
+
+    QSqlQuery query(m_database);
+    QString createSql = "CREATE TABLE IF NOT EXISTS files ("
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                        "messageId INTEGER, "
+                        "accountId INTEGER, "
+                        "friendId INTEGER, "
+                        "filename TEXT)";
+    if (!query.exec(createSql)) {
+        qDebug() << "Error: Failed to create table:" << query.lastError().text();
+        return false;
+    }
+
+    return true;
+}
+
+
+// 文件表新增函数
+bool DBManager::insertIntoFiles(qint64 messageId, qint64 accountId, qint64 friendId, const QString& filename) {
+    if (!m_database.isOpen()) {
+        qDebug() << "Error: Database is not opened";
+        return false;
+    }
+
+    QSqlQuery query(m_database);
+    query.prepare("INSERT INTO files (messageId, accountId, friendId, filename) VALUES (:messageId, :accountId, :friendId, :filename)");
+    query.bindValue(":messageId", messageId);
+    query.bindValue(":accountId", accountId);
+    query.bindValue(":friendId", friendId);
+    query.bindValue(":filename", filename);
+
+    if (!query.exec()) {
+        qDebug() << "Error: Failed to insert data into files table:" << query.lastError().text();
+        return false;
+    }
+
+    return true;
+}
+
+// 文件表查询函数
+QVariantMap DBManager::queryFiles(qint64 messageId, qint64 accountId, qint64 friendId) {
+    QVariantMap result;
+    if (!m_database.isOpen()) {
+        qDebug() << "Error: Database is not opened";
+        return result;
+    }
+    QSqlQuery query(m_database);
+    query.prepare("SELECT * FROM files WHERE messageId = :messageId AND accountId = :accountId AND friendId = :friendId");
+    query.bindValue(":messageId", messageId);
+    query.bindValue(":accountId", accountId);
+    query.bindValue(":friendId", friendId);
+
+    if (!query.exec()) {
+        qDebug() << "Error: Failed to query data from files table:" << query.lastError().text();
+        return result;
+    }
+    if (query.first()) {
+        QSqlRecord record = query.record();
+        for (int i = 0; i < record.count(); i++) {
+            result[record.fieldName(i)] = query.value(i);
+        }
+    }
+    return result;
+}
+
+
+

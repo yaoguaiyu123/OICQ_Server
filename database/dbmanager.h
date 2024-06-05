@@ -27,6 +27,10 @@ public:
     QList<QVariantMap> queryFriendRequests(qint64 friendId);
     bool insertFriendRequest(qint64 accountId, qint64 friendId);
     bool deleteFriendRequest(qint64 accountId, qint64 friendId);
+    // 文件映射表的创建
+    bool createTableFiles();
+    bool insertIntoFiles(qint64 messageId, qint64 accountId, qint64 firendId, const QString& filename);
+    QVariantMap queryFiles(qint64 messageId, qint64 accountId, qint64 friendId);
 
     bool openDatabase(const QString& dbName);
     void closeDatabase();
