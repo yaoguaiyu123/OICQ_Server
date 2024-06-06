@@ -155,6 +155,10 @@ void FileClientHandler::handleBytesWritten(qint64 size)
 
 void FileClientHandler::initSocket(int socketDescriptor)
 {
+    if (m_inited) {
+        return;
+    }
+    m_inited = true;
     qDebug() << "文件服务器初始化Socket";
     m_socket = new QTcpSocket(this);
     if (!m_socket->setSocketDescriptor(socketDescriptor)) {

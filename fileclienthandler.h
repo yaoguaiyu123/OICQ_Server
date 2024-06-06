@@ -20,7 +20,7 @@ private slots:
     void onReadyRead();
 private:
     QTcpSocket * m_socket = nullptr;
-
+    bool m_inited = false;
     // 接收
     bool is_Ubegin = false;
     qint64 recvSize = 0, totalSize = 0, from, to, messageId;

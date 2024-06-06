@@ -131,11 +131,14 @@ void TcpServer::transferFile(qint64 from, qint64 to, QString filename, QString f
     // 需要在数据库中存放文件的映射
     DBManager::singleTon().insertIntoFiles(messageId, from, to, filename);
     // 转发文件消息
+    QFileInfo info(filename);
+    QString fname = info.fileName().mid(8);
     for (auto& userSocket : socketList) {
         if (userSocket->userId() == to) {
             QJsonObject sendObj;
             sendObj.insert("from", from);
-            sendObj.insert("filename", filename);
+            sendObj.insert("filename", fname);
+            sendObj.insert("messageId", messageId);
             sendObj.insert("filesize", filesize);
             userSocket->packingMessage(sendObj, FileMessage);
             break;
