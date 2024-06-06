@@ -2,6 +2,7 @@
 #include "fileclienthandler.h"
 #include <QDebug>
 #include <QTcpSocket>
+#include <QThread>
 
 FileServer::FileServer(QObject* parent)
     : QTcpServer(parent)
@@ -11,7 +12,6 @@ FileServer::FileServer(QObject* parent)
 
 FileServer::~FileServer()
 {
-    QThreadPool::globalInstance()->waitForDone();
 }
 
 bool FileServer::startFileServer(const QHostAddress& address, quint16 port)
@@ -24,7 +24,15 @@ bool FileServer::startFileServer(const QHostAddress& address, quint16 port)
 void FileServer::incomingConnection(qintptr socketDescriptor)
 {
     qDebug() << "接收到新的文件上传或下载请求";
-    // QThreadPool默认自动删除QRunnable，在执行完run方法之后
-    FileClientHandler *handler = new FileClientHandler(socketDescriptor);
-    QThreadPool::globalInstance()->start(handler);
+
+    FileClientHandler *client = new FileClientHandler();
+    QThread *thread = new QThread();
+    client->moveToThread(thread);
+
+    connect(thread, &QThread::started, client, [client, socketDescriptor]() {
+        client->initSocket(socketDescriptor);
+    });
+    connect(client, &FileClientHandler::destroyed, thread, &QThread::quit);   //线程停止
+    connect(thread, &QThread::finished, thread, &QThread::deleteLater);  //释放线程资源
+    thread->start();
 }

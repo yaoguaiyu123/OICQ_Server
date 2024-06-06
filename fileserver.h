@@ -2,7 +2,6 @@
 #define SERVER_H
 
 #include <QTcpServer>
-#include <QThreadPool>
 // 文件服务器
 // 大致思路是一个请求 一个socket一个线程
 
