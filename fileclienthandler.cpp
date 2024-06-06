@@ -144,7 +144,7 @@ void FileClientHandler::parseDownloadFile(const QString& filename)
     if (filename.isEmpty()) {
         return;
     }
-    connect(m_socket,&QTcpSocket::bytesWritten,this,&FileClientHandler::handlerBytesWritten);
+    connect(m_socket,&QTcpSocket::bytesWritten,this,&FileClientHandler::handleBytesWritten);
     qDebug() << "客户端想要下载" << filename;
     QFileInfo fileInfo(filename);
     QString fname = fileInfo.fileName();
@@ -181,6 +181,7 @@ void FileClientHandler::handleBytesWritten(qint64 size)
     qDebug() << "成功写入:" << haveWritten;
     if (haveWritten == toWrite) {
         qDebug() <<"文件已经成功传送到客户端:" << toWrite;
+
     }
 }
 
