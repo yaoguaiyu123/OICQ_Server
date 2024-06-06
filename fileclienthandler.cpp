@@ -7,15 +7,16 @@
 #include "global.h"
 #include "tcpserver.h"
 #include "database/dbmanager.h"
+#include <QEventLoop>
 
 #define maxBlock 1024
 
 FileClientHandler::FileClientHandler(qintptr descriptor)
     : socketDescriptor(descriptor)
+    , haveWritten(0)
+    , toWrite(0)
 {
 }
-
-
 
 // 处理 下载文件开头 或者 上传文件 的函数
 void FileClientHandler::run()
@@ -85,14 +86,15 @@ void FileClientHandler::run()
             }
         } else if (byteArray[0] == 'D' && !is_Dbegin) {
             // 下载文件
-            qDebug() << "客户端想要下载1" << filename;
             is_Dbegin = true;
             byteArray.remove(0, 1);
             QDataStream stream(byteArray);
             qint64 to, from, messageId;
             stream >> messageId >> from >> to;
+            qDebug() << " " << messageId << " " << from << " " << to;
             QVariantMap vmap = DBManager::singleTon().queryFiles(messageId, from, to);
             QString filename = vmap.value("filename").toString();
+            qDebug() << "filename:" << filename;
             parseDownloadFile(filename);
             break;
         } else {
@@ -138,9 +140,11 @@ void FileClientHandler::run()
 /// 文件包数据
 void FileClientHandler::parseDownloadFile(const QString& filename)
 {
+    QEventLoop loop;
     if (filename.isEmpty()) {
         return;
     }
+    connect(m_socket,&QTcpSocket::bytesWritten,this,&FileClientHandler::handlerBytesWritten);
     qDebug() << "客户端想要下载" << filename;
     QFileInfo fileInfo(filename);
     QString fname = fileInfo.fileName();
@@ -150,6 +154,7 @@ void FileClientHandler::parseDownloadFile(const QString& filename)
         m_socket->write(uData);
         qint64 fileOffset = 0;
         qint64 fileSize = file.size(); // 文件大小
+        toWrite = fileSize;
         QByteArray infoBytes;
         QDataStream stream(&infoBytes, QIODevice::WriteOnly);
         QByteArray namebytes = fname.toUtf8();
@@ -162,11 +167,23 @@ void FileClientHandler::parseDownloadFile(const QString& filename)
             m_socket->write(byteArray);
             fileOffset += byteArray.size();
         }
-    } else {
+    }else {
         qDebug() << "文件路径错误" << filename;
     }
+    loop.exec();   //发送时需要开启事件循环
     file.close();
 }
+
+
+void FileClientHandler::handleBytesWritten(qint64 size)
+{
+    haveWritten += size;
+    qDebug() << "成功写入:" << haveWritten;
+    if (haveWritten == toWrite) {
+        qDebug() <<"文件已经成功传送到客户端:" << toWrite;
+    }
+}
+
 
 FileClientHandler::~FileClientHandler()
 {
