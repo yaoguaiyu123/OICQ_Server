@@ -9,6 +9,7 @@
 #include "global.h"
 #include <QThread>
 #include "database/dbmanager.h"
+#include <QDateTime>
 
 TcpServer::TcpServer(QObject* parent)
     : QTcpServer { parent }
@@ -87,13 +88,19 @@ void TcpServer::on_transpond(QJsonValue jsonvalue,qint64 from,QList<QImage> imag
     QJsonObject object = jsonvalue.toObject();
     qDebug() << "server接收到转发消息:" + object.value("message").toString();
     qint64 to = object.value("to").toInteger();
-    qDebug() << "to:" << to;
+    QString msg = object.value("message").toString();
+    QString strDateTime = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
+
+    // 加入到messages数据库(两条)
+    DBManager::singleTon().insertNormalMessage(from, to, msg, strDateTime, "normal");
+    DBManager::singleTon().insertNormalMessage(to, from, msg, strDateTime, "normal");
+
     // TODO 优化为Map查找 添加好友判断
     for (auto& userSocket : socketList) {
         if (userSocket->userId() == to) {
             QJsonObject sendObj;
             sendObj.insert("from", from);
-            sendObj.insert("message", object.value("message").toString());
+            sendObj.insert("message", msg);
             userSocket->packingMessage(sendObj, PrivateMessage, images);
             break;
         }
@@ -130,9 +137,16 @@ void TcpServer::transferFile(qint64 from, qint64 to, QString filename, QString f
 {
     // 需要在数据库中存放文件的映射
     DBManager::singleTon().insertIntoFiles(messageId, from, to, filename);
-    // 转发文件消息
     QFileInfo info(filename);
     QString fname = info.fileName().mid(8);
+    QString msg = "[文件] " + fname;
+    QString strDateTime = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss"); // 在消息数据库中存放文件消息
+
+    // 在数据库中存放文件消息(两条)
+    DBManager::singleTon().insertMessage(from, to, msg, messageId, fname, filesize, strDateTime, "file");
+    DBManager::singleTon().insertMessage(to, from, msg, messageId, fname, filesize, strDateTime, "file");
+
+    // 转发文件消息
     for (auto& userSocket : socketList) {
         if (userSocket->userId() == to) {
             QJsonObject sendObj;

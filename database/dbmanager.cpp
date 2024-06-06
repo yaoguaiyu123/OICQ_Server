@@ -473,4 +473,119 @@ QVariantMap DBManager::queryFiles(qint64 messageId, qint64 accountId, qint64 fri
 }
 
 
+// 创建消息表格
+bool DBManager::createTableMessages() {
+    if (!m_database.isOpen()) {
+        qDebug() << "Error: Database is not opened";
+        return false;
+    }
+
+    QSqlQuery query(m_database);
+    bool success = query.exec(
+        "CREATE TABLE IF NOT EXISTS messages ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "senderId INTEGER, "
+        "receiverId INTEGER, "
+        "message TEXT, "
+        "messageId INTEGER, "
+        "filename TEXT DEFAULT '', "
+        "filesize TEXT DEFAULT '', "
+        "messageDate TEXT, "
+        "messageType TEXT)"
+        );
+
+    if (!success) {
+        qDebug() << "Error: Failed to create messages table:" << query.lastError().text();
+        return false;
+    }
+
+    return true;
+}
+
+// 插入文件消息(messages)
+bool DBManager::insertMessage(qint64 senderId, qint64 receiverId, const QString& message,
+    qint64 messageId, const QString& filename, const QString& filesize,
+    const QString& messageDate, const QString& messageType) {
+    if (!m_database.isOpen()) {
+        qDebug() << "Error: Database is not opened";
+        return false;
+    }
+
+    QSqlQuery query(m_database);
+    query.prepare("INSERT INTO messages (senderId, receiverId, message, messageId, filename, filesize, messageDate, messageType) "
+                  "VALUES (:senderId, :receiverId, :message, :messageId, :filename, :filesize, :messageDate, :messageType)");
+    query.bindValue(":senderId", senderId);
+    query.bindValue(":receiverId", receiverId);
+    query.bindValue(":message", message);
+    query.bindValue(":messageId", messageId);
+    query.bindValue(":filename", filename);
+    query.bindValue(":filesize", filesize);
+    query.bindValue(":messageDate", messageDate);
+    query.bindValue(":messageType", messageType);
+
+    if (!query.exec()) {
+        qDebug() << "Error: Failed to insert data:" << query.lastError().text();
+        return false;
+    }
+
+    return true;
+}
+
+
+// 插入普通消息(messages)
+bool DBManager::insertNormalMessage(qint64 senderId, qint64 receiverId, const QString& message,
+    const QString& messageDate, const QString& messageType) {
+    if (!m_database.isOpen()) {
+        qDebug() << "Error: Database is not opened";
+        return false;
+    }
+
+    QSqlQuery query(m_database);
+    query.prepare("INSERT INTO messages (senderId, receiverId, message, messageDate, messageType) "
+                  "VALUES (:senderId, :receiverId, :message, :messageDate, :messageType)");
+    query.bindValue(":senderId", senderId);
+    query.bindValue(":receiverId", receiverId);
+    query.bindValue(":message", message);
+    query.bindValue(":messageDate", messageDate);
+    query.bindValue(":messageType", messageType);
+
+    if (!query.exec()) {
+        qDebug() << "Error: Failed to insert data:" << query.lastError().text();
+        return false;
+    }
+
+    return true;
+}
+
+// 查询两个人的聊天记录(messages)
+QList<QVariantMap> DBManager::queryMessages(qint64 senderId, qint64 receiverId) {
+    QList<QVariantMap> result;
+    if (!m_database.isOpen()) {
+        qDebug() << "Error: Database is not opened";
+        return result;
+    }
+
+    QSqlQuery query(m_database);
+    query.prepare("SELECT * FROM messages WHERE senderId = :senderId AND receiverId = :receiverId");
+    query.bindValue(":senderId", senderId);
+    query.bindValue(":receiverId", receiverId);
+
+    if (query.exec()) {
+        while (query.next()) {
+            QVariantMap row;
+            QSqlRecord record = query.record();
+            for (int i = 0; i < record.count(); i++) {
+                row[record.fieldName(i)] = query.value(i);
+            }
+            result.append(row);
+        }
+    } else {
+        qDebug() << "Error: Failed to query data:" << query.lastError().text();
+    }
+
+    return result;
+}
+
+
+
 

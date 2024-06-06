@@ -54,7 +54,8 @@ enum MSG_TYPE {
     AddFriendRequest,
     AddFriendRes,
     FriendRequestList,
-    UpLoadFileRequest
+    UpLoadFileRequest,
+    MessageList
 };
 
 enum RETURN{

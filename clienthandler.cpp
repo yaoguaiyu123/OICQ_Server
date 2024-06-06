@@ -233,6 +233,9 @@ void ClientHandler::parsePackage()
     case FriendRequestList:
         parseFriendRequestList();
         break;
+    case MessageList:
+        parseMessageList();
+        break;
     default:
         break;
     }
@@ -350,7 +353,9 @@ void ClientHandler::parseFriendList(qint64 userId)
             imagelist.clear();
         }
     }
-    packingMessage(sendObj, FriendList, imagelist);
+    if(sendObj.size() > 0){
+        packingMessage(sendObj, FriendList, imagelist);
+    }
 }
 
 // 更新头像
@@ -408,10 +413,10 @@ void ClientHandler::parseAddFriendRes(QJsonValue jsonvalue)
     DBManager::singleTon().deleteFriendRequest(friendId, m_userId);   //数据库中删除该条好友有请求
 }
 
-//处理获取好友添加请求列表(分多次发送)
+//处理获取好友添加请求列表 分多次发送 , TODO 一次发送多个
 void ClientHandler::parseFriendRequestList()
 {
-    qDebug() << "加载离线好友请求";
+    // qDebug() << "加载离线好友请求";
     QList<QImage> imageList;
     QList<QVariantMap> mapLists = DBManager::singleTon().queryFriendRequests(m_userId);
     for (auto& vmap : mapLists) {
@@ -430,7 +435,44 @@ void ClientHandler::parseFriendRequestList()
     }
 }
 
+// 获取消息列表
+void ClientHandler::parseMessageList()
+{
+    qDebug() << "获取好友历史消息";
+    QJsonArray sendArray;
+    // 先查找所有好友
+    QList<QVariantMap> friendlist = DBManager::singleTon().queryDataFriends(m_userId);
+    // 遍历每个好友
+    for (const QVariantMap& fvmap : friendlist) {
+        qint64 friendId = fvmap.value("friendid").toLongLong();
+        QList<QVariantMap> sendMessageList = DBManager::singleTon().queryMessages(m_userId, friendId);
+        QList<QVariantMap> recvMessageList = DBManager::singleTon().queryMessages(friendId, m_userId);
+        // 合并两个列表
+        QList<QVariantMap> combinedList = sendMessageList;
+        combinedList.append(recvMessageList);
+        // 根据日期从小到大排序
+        std::sort(combinedList.begin(), combinedList.end(), [](const QVariantMap& map1, const QVariantMap& map2) {
+            return map1["messageDate"].toString() < map2["messageDate"].toString();
+        });
+        // 遍历合并之后的消息列表
+        for (const QVariantMap& messageMap : combinedList) {
+            QJsonObject sendobj;
+            for (QVariantMap::const_iterator it = messageMap.begin(); it != messageMap.end(); ++it) {
+                sendobj.insert(it.key(), QJsonValue::fromVariant(it.value()));
+            }
+            sendArray.append(sendobj);
+        }
+        // 一次至少发送100条消息
+        if (sendArray.size() >= 100) {
+            packingMessage(sendArray, MessageList);
+            sendArray = QJsonArray(); // 清空数据
+        }
+    }
+    if (sendArray.size() > 0) {
+        packingMessage(sendArray, MessageList);
+    }
 
+}
 
 
 

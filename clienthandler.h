@@ -119,6 +119,7 @@ private:
     void parseUpdateHead(qint64 userId,  QList<QImage> images);
     void parseAddFriendRes(QJsonValue jsonvalue);
     void parseFriendRequestList();
+    void parseMessageList();
 };
 
 #endif // CLIENTHANDLER_H
