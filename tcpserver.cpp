@@ -46,17 +46,16 @@ void TcpServer::closeListen()
 void TcpServer::incomingConnection(qintptr socketDescriptor)
 {
     qDebug() << "服务端获取一个新的连接,正在创建套接字.....";
-    QTcpSocket* socket = new QTcpSocket();
-    socket->setSocketDescriptor(socketDescriptor);
+    ClientHandler* clientHandler = new ClientHandler(socketDescriptor, this);
     QThread* thread = new QThread;
-    socket->moveToThread(thread);   //在一个线程中运行socket
-    thread->start();
-    threadList.append(thread);
-    ClientHandler* clientHandler = new ClientHandler(socket, this);
+    connect(thread, &QThread::started, clientHandler, &ClientHandler::init);
     connect(clientHandler, &ClientHandler::disconnected, this, &TcpServer::on_disconnected);
     connect(clientHandler, &ClientHandler::transpond, this, &TcpServer::on_transpond);
     connect(clientHandler, &ClientHandler::addFriend, this, &TcpServer::on_addFriend);
     connect(clientHandler, &ClientHandler::addFriendRes, this, &TcpServer::on_addFriendRes);
+    clientHandler->moveToThread(thread);   //在一个线程中运行
+    thread->start();
+    threadList.append(thread);
     socketList.append(clientHandler);
 }
 

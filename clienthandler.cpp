@@ -12,15 +12,23 @@
 #include <QBuffer>
 #include <QImage>
 
-ClientHandler::ClientHandler(QTcpSocket* tcpSocket, QObject* parent)
+ClientHandler::ClientHandler(qintptr socketDescriptor, QObject* parent)
     : QObject(parent)
-    , m_tcpSocket(tcpSocket)
+    , m_descriptor(socketDescriptor)
 {
+    m_sendbuf = new uchar[32 * 1024 * 1024];
+}
+
+// 初始化
+void ClientHandler::init()
+{
+    qDebug() << "初始化套接字.......";
+    m_tcpSocket = new QTcpSocket();
+    m_tcpSocket->setSocketDescriptor(m_descriptor);
     connect(m_tcpSocket, &QTcpSocket::readyRead, this, &ClientHandler::on_ready_read);
     connect(m_tcpSocket, &QTcpSocket::disconnected,[this]() {
         emit(disconnected(m_userId));
     });
-    m_sendbuf = new uchar[32 * 1024 * 1024];
 }
 
 qint64 ClientHandler::userId()
@@ -220,20 +228,11 @@ void ClientHandler::parsePackage()
     case Login:
         parseLogin(byteArrayToJson(msgData));
         break;
-    case FriendList:
-        parseFriendList(userId);
-        break;
     case UpdateHead:
         parseUpdateHead(userId, images);
         break;
     case AddFriendRes:
         parseAddFriendRes(byteArrayToJson(msgData));
-        break;
-    case FriendRequestList:
-        parseFriendRequestList();
-        break;
-    case MessageList:
-        parseMessageList();
         break;
     default:
         break;
@@ -272,6 +271,9 @@ void ClientHandler::parseLogin(QJsonValue jsonvalue)
             }
             imageList.append(image);
             packingMessage(sendObj, Login, imageList);
+            sendFriendList();
+            sendFriendRequestList();
+            sendMessageList();
             return;
         }
     }
@@ -318,42 +320,6 @@ void ClientHandler::parseAddFriend(QJsonValue jsonvalue)
         imageList.append(image);
         DBManager::singleTon().insertFriendRequest(m_userId, friendId);  //在请求表中插入数据
         emit(addFriend(friendId,username, m_userId,imageList));
-    }
-}
-
-// 获取好友列表
-void ClientHandler::parseFriendList(qint64 userId)
-{
-    QJsonArray sendObj;
-    QList<QVariantMap> list = DBManager::singleTon().queryDataFriends(userId);
-    qDebug() << userId << "的好友数量" << list.length();
-    QList<QImage> imagelist;
-    for (const auto& e : list) {
-        qint64 fid = e.value("friendid").toLongLong();
-        QVariantMap inmap = DBManager::singleTon().queryDataUser(fid);
-        QString username = inmap.value("username").toString();
-        // qDebug() << username;
-        QString headpath = inmap.value("headpath").toString();
-        QJsonObject obj;
-        obj.insert("userId", fid);
-        obj.insert("username", username);
-        QImage image;
-        image.load(headpath);
-        if (image.isNull()) {
-            continue;
-        }
-        qDebug() << "返回好友列表头像 " << headpath;
-        imagelist.append(image);
-        sendObj.append(obj);
-        // 判断是否已经到达上限
-        if (imagelist.length() == 10) {
-            packingMessage(sendObj, FriendList, imagelist);
-            sendObj = QJsonArray();
-            imagelist.clear();
-        }
-    }
-    if(sendObj.size() > 0){
-        packingMessage(sendObj, FriendList, imagelist);
     }
 }
 
@@ -412,8 +378,46 @@ void ClientHandler::parseAddFriendRes(QJsonValue jsonvalue)
     DBManager::singleTon().deleteFriendRequest(friendId, m_userId);   //数据库中删除该条好友有请求
 }
 
-//处理获取好友添加请求列表 分多次发送 , TODO 一次发送多个
-void ClientHandler::parseFriendRequestList()
+
+// 发送好友列表
+void ClientHandler::sendFriendList()
+{
+    QJsonArray sendObj;
+    QList<QVariantMap> list = DBManager::singleTon().queryDataFriends(m_userId);
+    qDebug() << m_userId << "的好友数量" << list.length();
+    QList<QImage> imagelist;
+    for (const auto& e : list) {
+        qint64 fid = e.value("friendid").toLongLong();
+        QVariantMap inmap = DBManager::singleTon().queryDataUser(fid);
+        QString username = inmap.value("username").toString();
+        // qDebug() << username;
+        QString headpath = inmap.value("headpath").toString();
+        QJsonObject obj;
+        obj.insert("userId", fid);
+        obj.insert("username", username);
+        QImage image;
+        image.load(headpath);
+        if (image.isNull()) {
+            continue;
+        }
+        qDebug() << "返回好友列表头像 " << headpath;
+        imagelist.append(image);
+        sendObj.append(obj);
+        // 判断是否已经到达上限
+        if (imagelist.length() == 10) {
+            packingMessage(sendObj, FriendList, imagelist);
+            sendObj = QJsonArray();
+            imagelist.clear();
+        }
+    }
+    if(sendObj.size() > 0){
+        packingMessage(sendObj, FriendList, imagelist);
+    }
+}
+
+
+//发送获取好友添加请求列表 分多次发送 , TODO 一次发送多个
+void ClientHandler::sendFriendRequestList()
 {
     // qDebug() << "加载离线好友请求";
     QList<QImage> imageList;
@@ -434,8 +438,8 @@ void ClientHandler::parseFriendRequestList()
     }
 }
 
-// 获取消息列表
-void ClientHandler::parseMessageList()
+// 发送消息列表
+void ClientHandler::sendMessageList()
 {
     qDebug() << "获取好友历史消息";
     QJsonArray sendArray;

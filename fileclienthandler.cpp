@@ -150,6 +150,7 @@ void FileClientHandler::handleBytesWritten(qint64 size)
     qDebug() << "成功写入:" << haveWritten;
     if (haveWritten == toWrite) {
         qDebug() <<"文件已经成功传送到客户端:" << toWrite;
+        deleteLater();
     }
 }
 
@@ -172,6 +173,7 @@ void FileClientHandler::initSocket(int socketDescriptor)
 
 FileClientHandler::~FileClientHandler()
 {
+    qDebug() << "文件传输完毕， 线程退出";
     if (m_socket != nullptr) {
         delete m_socket;
         m_socket = nullptr;
