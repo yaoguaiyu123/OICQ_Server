@@ -41,7 +41,6 @@ void ClientHandler::packingMessage(QJsonValue value, int msgType,  QList<QImage>
         return;
     }
     QByteArray bytes = doc.toJson();
-
     MESG* message = new MESG();
     message->msg_type = static_cast<MSG_TYPE>(msgType);
     message->len = bytes.size();

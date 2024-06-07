@@ -91,9 +91,8 @@ void TcpServer::on_transpond(QJsonValue jsonvalue,qint64 from,QList<QImage> imag
     QString msg = object.value("message").toString();
     QString strDateTime = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
 
-    // 加入到messages数据库(两条)
+    // 加入到messages数据库
     DBManager::singleTon().insertNormalMessage(from, to, msg, strDateTime, "normal");
-    DBManager::singleTon().insertNormalMessage(to, from, msg, strDateTime, "normal");
 
     // TODO 优化为Map查找 添加好友判断
     for (auto& userSocket : socketList) {
@@ -142,9 +141,8 @@ void TcpServer::transferFile(qint64 from, qint64 to, QString filename, QString f
     QString msg = "[文件] " + fname;
     QString strDateTime = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss"); // 在消息数据库中存放文件消息
 
-    // 在数据库中存放文件消息(两条)
+    // 在数据库中存放文件消息
     DBManager::singleTon().insertMessage(from, to, msg, messageId, fname, filesize, strDateTime, "file");
-    DBManager::singleTon().insertMessage(to, from, msg, messageId, fname, filesize, strDateTime, "file");
 
     // 转发文件消息
     for (auto& userSocket : socketList) {
