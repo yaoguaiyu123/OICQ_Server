@@ -96,7 +96,7 @@ void FileClientHandler::onReadyRead()
         // qDebug() << from << " " << to << " " << newFileName;
         TcpServer::singleTon().transferFile(from, to, newFileName, filesize, messageId);
         file.close();
-        deleteLater();
+        // deleteLater();
     }
 }
 
@@ -147,10 +147,10 @@ void FileClientHandler::parseDownloadFile(const QString& filename)
 void FileClientHandler::handleBytesWritten(qint64 size)
 {
     haveWritten += size;
-    qDebug() << "成功写入:" << haveWritten;
+    qDebug() << "成功写入到与客户端通信的socket:" << haveWritten;
     if (haveWritten == toWrite) {
         qDebug() <<"文件已经成功传送到客户端:" << toWrite;
-        deleteLater();
+        // deleteLater();
     }
 }
 

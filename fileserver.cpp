@@ -32,7 +32,11 @@ void FileServer::incomingConnection(qintptr socketDescriptor)
     connect(thread, &QThread::started, client, [client, socketDescriptor]() {
         client->initSocket(socketDescriptor);
     });
-    connect(client, &FileClientHandler::destroyed, thread, &QThread::quit);   //线程停止
+    connect(client, &FileClientHandler::destroyed, thread, &QThread::quit); //线程停止
+    connect(client, &FileClientHandler::destroyed, [client]() {
+        qDebug() << "接收到信号断开，处理socket和thread资源回收";
+    });
+
     connect(thread, &QThread::finished, thread, &QThread::deleteLater);  //释放线程资源
     thread->start();
 }
